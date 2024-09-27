@@ -2,7 +2,7 @@
 name = "pmvalsampsize"
 version = "0.1.0"
 description = "Sample size for external validation of a prediction model"
-authors = ["Rebecca Whittle"]
+authors = ["Rebecca Whittle, Joie Ensor"]
 license = "GNU General Public License v3.0"
 readme = "README.md"
 
