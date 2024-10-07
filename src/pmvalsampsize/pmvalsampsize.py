@@ -4,7 +4,144 @@ def pmvalsampsize(type, prevalence=None, cstatistic=None, oe=1, oeciwidth=0.2,
                   increment=0.1, oeseincrement=1e-04, seed=123456, 
                   graph=False,trace=False,sensitivity=None, specificity=None, 
                   threshold=None, nbciwidth=0.2, nbseincrement=1e-04, noprint=None): 
-
+    """Computes the minimum sample size required for the external validation of an existing multivariable prediction model
+ 
+     Parameters
+    ----------
+    type: str
+        specifies the type of analysis for which sample size is being calculated
+        "b" specifies sample size calculation for a prediction model with a binary outcome
+    cslope: float, default=1
+        specifies the anticipated c-slope performance in the validation sample. 
+        The value could alternatively be based on a previous validation study for example. 
+        For binary outcomes the c-slope calculation requires the user to specify a distribution 
+        for the assumed LP in the validation sample 
+        (or alternatively the distribution of predicted probabilities in the validation sample). 
+        See lp*() options below.
+    csciwidth: float, default=0.2
+        specifies the target CI width (acceptable precision) for the c-slope performance. 
+    oe: float, default=1
+        specifies the anticipated O/E performance in the validation sample. 
+    oeciwidth: float, default=0.2
+        specifies the target CI width (acceptable precision) for the E/O performance. 
+        The choice of CI width is context specific, 
+        and depends on the event probability in the population. 
+        See Riley et al. for further details.
+    cstatistic: float
+        specifies the anticipated c-statistic performance in the validation sample. 
+        This is a required input. 
+        May be based on the optimism-adjusted c-statistic reported in the development study 
+        for the existing prediction model. Ideally, this should be an optimism-adjusted c-statistic. 
+        NB: This input is also used when using the lpcstat() option.
+    cstatciwidth: float, default=0.1
+        specifies the target CI width (acceptable precision) for the c-statistic performance. 
+    simobs: int, default=1000000
+        specifies the number of observations to use when simulating the 
+        LP distribution for c-slope calculation in criteria 2. 
+        Higher simobs() values will reduce random variation further. 
+    lpnormal: float, optional
+        defines parameters to simulate the LP distribution for criteria 2 from a normal distribution. 
+        The user must specify the mean and standard deviation (in this order) of the LP distribution.
+    lpbeta: float, optional
+        defines parameters to simulate the distribution of predicted probabilities
+        for criteria 2 from a beta distribution. 
+        The user must specify the alpha and beta parameters (in this order) of the
+        probability distribution. 
+        The LP distribution is then generated internally using this probability distribution.
+    lpcstat: float, optional
+        defines parameters to simulate the LP distribution for criteria 2 assuming
+        that the distribution of events and non-events are normal with a common variance. 
+        The user specifies a single input value- the expected mean for the non-events distribution.
+        This could be informed by clinical guidance. 
+        However, this input is taken as a starting value and an iterative process 
+        is used to identify the most appropriate values for the event and non-event
+        distributions so as to closely match the anticipated prevalence in the 
+        validation sample. 
+        NB: this approach makes strong assumptions of normality and equal variances
+        in each outcome group, which may be unrealistic in most situations.
+    tolerance: float, default=0.0005
+        for use with lpcstat option. Sets the tolerance for agreement between the 
+        simulated and expected event proportion during the iterative procedure 
+        for calculating the mean for the non-events distribution.
+    increment: float, default=0.1
+        for use with lpcstat option. Sets increment by which to iterate the value 
+        of the mean for the non-events distribution. 
+        Trial and error may be necessary as it is dependent on how close the 
+        initial input for the non-event mean in lpcstat is to the required value. 
+        If the process takes a particularly long time then the user could try an 
+        alternative increment value, or an alternative non-event mean value in lpcstat. 
+        The trace option may be useful in such circumstances.
+    oeseincrement: float, default=0.0001
+        sets the increment by which to iterate when identifying the SE(ln(OE)) to 
+        meet the target CI width specified for OE. 
+        In the majority of cases this will be suitably small to ensure a precise 
+        SE is identified. 
+        The user should check the output table to ensure that the target CI width 
+        has been attained and adjust the increment if necessary.
+    graph: bool, default=False
+        specifies that a histogram of the simulated LP distribution for criteria 2 is produced. 
+        The graph also details summary statistics for the simulated distribution. 
+        Useful option for checking the simulated LP distribution against the source of input parameters. Also useful for reporting at publication.
+    trace: bool, default=False
+        for use with `lpcstat` option. 
+        Specifies that a trace of the values obtained in each iteration when 
+        identifying the non-event mean is output. 
+        Useful when finding the appropriate values for `lpcstat` & `increment` is proving difficult!
+    prevalence: float, optional
+        specifies the overall outcome proportion (for a prognostic model) or 
+        overall prevalence (for a diagnostic model) expected 
+        within the model validation sample. 
+        This is a required input. 
+        This should be derived based on previous studies in the same population 
+        or directly from the validation sample if to hand.
+    seed: int, default=123456
+        specifies the initial value of the random-number seed used by the 
+        random-number functions when simulating data to approximate the LP 
+        distribution for criteria 2.
+    sensitivity: float, optional
+        specifies the anticipated sensitivity performance in the validation sample 
+        at the chosen risk threshold (specified using `threshold`). 
+        If sensitivity and specificity are not provided then `pmvalsampsize` 
+        uses the simulated LP distribution from criteria 2 and the user-specified 
+        risk threshold to estimate the anticipated sensitivity and specificity 
+        to be used in calculation of net benefit. 
+        NB: net benefit criteria is not calculated if either
+        i) `sensitivity`, `specificity` and `threshold` 
+        or ii) `threshold` option are not specified.
+    specificity: float, optional
+        specifies the anticipated specificity performance in the validation sample 
+        at the chosen risk threshold (specified using `threshold`). 
+        If sensitivity and specificity are not provided then `pmvalsampsize` 
+        uses the simulated LP distribution from criteria 2 and the user-specified 
+        risk threshold to estimate the anticipated sensitivity and specificity 
+        to be used in calculation of net benefit. 
+        NB: net benefit criteria is not calculated if either
+        i) `sensitivity`, `specificity` and `threshold` 
+        or ii) `threshold` option are not specified.
+    threshold: float, optional
+        specifies the risk threshold to be used for calculation of net benefit 
+        performance of the model in the validation sample. 
+        If `sensitivity` and `specificity` are not provided then `threshold` must 
+        be given in order for `pmvalsampsize` to assess sample size 
+        requirements for net benefit. 
+        NB: net benefit criteria is not calculated if either
+        i) `sensitivity`, `specificity` and `threshold` 
+        or ii) `threshold` option are not specified.
+    nbciwidth: float, default=0.2
+        specifies the target CI width (acceptable precision) for the standardised 
+        net benefit performance. 
+        The choice of CI width is context specific. See Riley et al. for further details.   
+    nbseincrement: float, default=0.0001
+        sets the increment by which to iterate when identifying the 
+        SE(standardised net benefit) to meet the target CI width specified 
+        for standardised net benefit. 
+        In the majority of cases this will be suitably small to ensure a 
+        precise SE is identified. The user should check the output table to ensure 
+        that the target CI width has been attained and adjust the increment if necessary.
+    noprint: bool, default=False
+        supresses output being printed    
+    """
+    
 #error checking
     pmvalsampsize_errorcheck(type=type,prevalence=prevalence,
                              cstatistic=cstatistic,oe=oe,oeciwidth=oeciwidth,
