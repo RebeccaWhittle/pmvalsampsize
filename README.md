@@ -10,7 +10,15 @@ $ pip install pmvalsampsize
 
 ## Usage
 
-- TODO
+Computes the minimum sample size required for the external validation of an existing multivariable prediction model using the criteria proposed by [Archer (2020)](doi:10.1002/sim.8766) and [Riley (2021)](doi:10.1002/sim.9025)
+
+```python
+from pmvalsampsize.pmvalsampsize import *
+
+samplesize = pmvalsampsize(type="b", cstatistic=0.8, graph=True, lpbeta=(1.33, 1.75), prevalence=0.43, noprint=True) # change options to meet youor requirements
+plt.show()
+summary(samplesize)
+```
 
 ## Contributing
 
