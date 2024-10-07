@@ -6,7 +6,7 @@ def pmvalsampsize(type, prevalence=None, cstatistic=None, oe=1, oeciwidth=0.2,
                   threshold=None, nbciwidth=0.2, nbseincrement=1e-04, noprint=None): 
     """Computes the minimum sample size required for the external validation of an existing multivariable prediction model
  
-     Parameters
+    Parameters
     ----------
     type: str
         specifies the type of analysis for which sample size is being calculated
