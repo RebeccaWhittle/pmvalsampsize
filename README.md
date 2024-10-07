@@ -10,7 +10,10 @@ $ pip install pmvalsampsize
 
 ## Usage
 
-Computes the minimum sample size required for the external validation of an existing multivariable prediction model using the criteria proposed by [Archer (2020)](doi:10.1002/sim.8766) and [Riley (2021)](doi:10.1002/sim.9025)
+`pmvalsampsize` computes the minimum sample size required for the external validation of an existing multivariable prediction model using the criteria proposed by [Archer (2020)](doi:10.1002/sim.8766) and [Riley (2021)](doi:10.1002/sim.9025)
+`pmvalsampsize` can currently be used to calculate the minimum sample size for the external validation of models with binary outcomes.
+
+*Continuous and survival (time-to-event) outcome model calculations are a work in progress.*
 
 ```python
 from pmvalsampsize.pmvalsampsize import *
