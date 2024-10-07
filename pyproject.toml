@@ -20,6 +20,10 @@ scikit-learn = "^1.5.2"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 pytest-cov = "^5.0.0"
+jupyter = "^1.1.1"
+myst-nb = {version = "^1.1.2", python = "^3.9"}
+sphinx-autoapi = "^3.3.2"
+sphinx-rtd-theme = "^3.0.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
