@@ -3,7 +3,9 @@ def pmvalsampsize(type, prevalence=None, cstatistic=None, oe=1, oeciwidth=0.2,
                   lpnormal=None, lpbeta=None, lpcstat=None, tolerance=5e-04, 
                   increment=0.1, oeseincrement=1e-04, seed=123456, 
                   graph=False,trace=False,sensitivity=None, specificity=None, 
-                  threshold=None, nbciwidth=0.2, nbseincrement=1e-04, noprint=None): 
+                  threshold=None, nbciwidth=0.2, nbseincrement=1e-04,  noprint=None,
+                  accuracyciwidth=0.1, precisionciwidth=0.1, npvciwidth=0.1, 
+                  recallciwidth=0.1, specciwidth=0.1, f1ciwidth=0.1, verbose=None): 
     """Computes the minimum sample size required for the external validation of an existing multivariable prediction model
  
     Parameters
@@ -139,7 +141,24 @@ def pmvalsampsize(type, prevalence=None, cstatistic=None, oe=1, oeciwidth=0.2,
         precise SE is identified. The user should check the output table to ensure 
         that the target CI width has been attained and adjust the increment if necessary.
     noprint: bool, default=False
-        supresses output being printed    
+        supresses output being printed
+    accuracyciwidth: float, default=0.1
+        specifies the target 95% CI width (acceptable precision) for the classification accuracy. 
+    precisionciwidth: float, default=0.1
+        specifies the target 95% CI width (acceptable precision) for the precision measure.  
+    npvciwidth: float, default=0.1
+        specifies the target 95% CI width (acceptable precision) for the npv measure.  
+    recallciwidth: float, default=0.1
+        specifies the target 95% CI width (acceptable precision) for the recall measure.   
+    specciwidth: float, default=0.1
+        specifies the target 95% CI width (acceptable precision) for the specificity.  
+    f1ciwidth: float, default=0.1
+        specifies the target 95% CI width (acceptable precision) for the F1-score. 
+    verbose: bool, default=False  
+        for use with threshold. When a threshold is given, 
+        verbose can be used to display the minimum required sample size and expected precision 
+        for the overall minimum required sammple size for additional 
+        performance measures (accuracy, recall, precision, specificity, F1-score, NPV).                                                 
     """
     
 #error checking
@@ -152,7 +171,10 @@ def pmvalsampsize(type, prevalence=None, cstatistic=None, oe=1, oeciwidth=0.2,
                              oeseincrement=oeseincrement,increment=increment,
                              trace=trace,sensitivity=sensitivity,
                              specificity=specificity,threshold=threshold,
-                             nbciwidth=nbciwidth,nbseincrement=nbseincrement, noprint=noprint)
+                             nbciwidth=nbciwidth,nbseincrement=nbseincrement, noprint=noprint,
+                             accuracyciwidth=accuracyciwidth, precisionciwidth=precisionciwidth,
+                             npvciwidth=npvciwidth, recallciwidth=recallciwidth, 
+                             specciwidth=specciwidth, f1ciwidth=f1ciwidth, verbose=verbose)
 
     if type == "b":
         out = pmvalsampsize_bin(prevalence=prevalence,cstatistic=cstatistic,
@@ -164,7 +186,10 @@ def pmvalsampsize(type, prevalence=None, cstatistic=None, oe=1, oeciwidth=0.2,
                                 oeseincrement=oeseincrement,
                                 sensitivity=sensitivity,nbciwidth=nbciwidth,
                                 specificity=specificity,threshold=threshold,
-                                nbseincrement=nbseincrement, noprint=noprint)
+                                nbseincrement=nbseincrement, noprint=noprint,
+                                accuracyciwidth=accuracyciwidth, precisionciwidth=precisionciwidth,
+                                npvciwidth=npvciwidth, recallciwidth=recallciwidth, 
+                                specciwidth=specciwidth, f1ciwidth=f1ciwidth, verbose=verbose)
     return out
 
 
@@ -174,7 +199,9 @@ def pmvalsampsize_errorcheck(type,prevalence,cstatistic,oe,oeciwidth,cslope,
                              csciwidth,cstatciwidth,simobs,lpnormal,lpbeta,
                              lpcstat,tolerance,increment,oeseincrement,seed,
                              graph,trace,sensitivity,specificity,threshold,
-                             nbciwidth,nbseincrement,noprint): 
+                             nbciwidth,nbseincrement,noprint,accuracyciwidth,
+                             precisionciwidth,npvciwidth,recallciwidth,
+                             specciwidth,f1ciwidth,verbose): 
 
    
     if type not in ["c", "b", "s"]:
@@ -238,7 +265,9 @@ from sklearn.metrics import (accuracy_score, confusion_matrix,
 def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
                       cstatciwidth,simobs,lpnormal,lpbeta,lpcstat,tolerance,
                       increment,oeseincrement,seed,graph,trace,sensitivity,
-                      specificity,threshold,nbciwidth,nbseincrement,noprint): 
+                      specificity,threshold,nbciwidth,nbseincrement,noprint,
+                      accuracyciwidth,precisionciwidth,npvciwidth,recallciwidth,
+                      specciwidth,f1ciwidth,verbose): 
 
 
 
@@ -530,15 +559,34 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
         nb_p = np.exp(LP)/(1+np.exp(LP))
         nb_outcome = np.random.binomial(n=1, p=nb_p, size=simobs)
 
-        nb_df = pd.DataFrame(data = {'nb_outcome': nb_outcome, 'nb_p': nb_p})
-        nb_df['classification'] = 1
-        nb_df.loc[nb_df['nb_p'] < threshold, 'classification'] = 0
+        nb_positive = pd.Series(0, index=nb_outcome).mask(nb_p>threshold, 1)
 
-        sensitivity = round(nb_df.classification[nb_df.nb_outcome==1].sum() 
-                            / (nb_df['nb_outcome']==1).sum(), 3)
-        specificity = round(((nb_df['nb_outcome']==0).sum() 
-                             - nb_df.classification[nb_df.nb_outcome==0].sum()) 
-                             / (nb_df['nb_outcome']==0).sum(), 3)
+        nb_df = pd.DataFrame(data = {'outcome': nb_outcome, 'p': nb_p, 'positive': nb_positive})
+
+        sensitivity = round(nb_df.positive[nb_df.outcome==1].mean(), 3)
+        specificity = 1 - round(nb_df.positive[nb_df.outcome==0].mean(), 3)
+
+        # calcaulte true positivies, negatives etc of simulated data
+        nb_df.loc[(nb_df['outcome']==1) & (nb_df['positive']==1), 'tp'] = 1
+        nb_df.loc[(nb_df['outcome']==0) & (nb_df['positive']==1), 'fp'] = 1
+        nb_df.loc[(nb_df['outcome']==0) & (nb_df['positive']==0), 'tn'] = 1
+        nb_df.loc[(nb_df['outcome']==1) & (nb_df['positive']==0), 'fn'] = 1
+        TP = len(nb_df[nb_df.tp==1])
+        FP = len(nb_df[nb_df.fp==1])
+        TN = len(nb_df[nb_df.tn==1])
+        FN = len(nb_df[nb_df.fn==1])
+
+        
+        
+#        nb_df = pd.DataFrame(data = {'nb_outcome': nb_outcome, 'nb_p': nb_p})
+#        nb_df['classification'] = 1
+#        nb_df.loc[nb_df['nb_p'] < threshold, 'classification'] = 0
+
+#        sensitivity = round(nb_df.classification[nb_df.nb_outcome==1].sum() 
+#                            / (nb_df['nb_outcome']==1).sum(), 3)
+#        specificity = round(((nb_df['nb_outcome']==0).sum() 
+#                             - nb_df.classification[nb_df.nb_outcome==0].sum()) 
+#                             / (nb_df['nb_outcome']==0).sum(), 3)
  
         nb = (sensitivity*prevalence) 
         - ((1-specificity)*(1-prevalence)*(threshold/(1-threshold)))
@@ -564,13 +612,60 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
                          +(w*w*(1-specificity)*(1-specificity)
                            /(prevalence*(1-prevalence)))))
 
+#############################
+# additional criteria
+
+        # accuracy
+        accuracy=(TP+TN)/(TP+FP+TN+FN)
+        se_accuracy = round((accuracyciwidth / (2 * 1.96)), 4)
+        n5 = math.ceil((accuracy * (1 - accuracy)) / se_accuracy**2)
+
+        # specficity
+        se_spec = round((specciwidth / (2 * 1.96)), 4)
+        n6 = math.ceil((specificity * (1 - specificity)) / ((se_spec**2) * (1 - prevalence)))
+
+        # sensitivity
+        recall = sensitivity
+        se_recall = round((recallciwidth / (2 * 1.96)), 4)
+        n7 = math.ceil((recall * (1 - recall)) / (prevalence * (se_recall**2)))
+
+        # precision
+        precision = TP / (TP + FP)
+        se_precision = round((precisionciwidth / (2 * 1.96)), 4)
+        n8 = math.ceil((precision**2 * (1 - precision)) / ((se_precision**2) * prevalence * recall))
+
+        # F1 score
+        f1 = 2 / (1 / precision + 1 / recall)
+        df_iter = pd.DataFrame({'size': range(1, 100001)})
+        df_iter['se_precision'] = np.sqrt((precision*(1-precision))/(recall*df_iter['size']*prevalence/precision))
+        df_iter['se_recall'] = np.sqrt((recall*(1-recall))/(df_iter['size']*prevalence))
+        df_iter['cov_P_R']=(((precision*(1-precision)*(1-recall))/prevalence)+((precision*(1-precision)*specificity)/(1-prevalence)))/df_iter['size']
+        df_iter['se_F1'] = np.sqrt(4 * (recall**4*df_iter['se_precision']**2 + 2*precision**2*recall**2*df_iter['cov_P_R'] + precision**4*df_iter['se_recall']**2) / (precision+recall)**4)
+
+        results = {}
+        for m in ['precision', 'recall', 'F1']:
+            se_column = f'se_{m}'
+            filtered_df = df_iter[df_iter[se_column] <= 0.0255]
+            if not filtered_df.empty:
+                results[f'SS_{m}'] = filtered_df['size'].min()
+            else:
+                results[f'SS_{m}'] = None
+        se_f1 = round((f1ciwidth / (2 * 1.96)), 4)
+        n9 = results.get('SS_F1', float('-inf'))
+
+        # NPV
+        npv = TN / (TN + FN)
+        se_npv = round((npvciwidth / (2 * 1.96)), 4)
+        n10 = math.ceil((npv * (1 - npv)) / (se_npv**2 * ((specificity * (1 - prevalence)) + (prevalence * (1 - recall))))) 
+       
+        
         no_nb = False
 
     else:  
         no_nb = True
-   
-   
-   
+
+
+    
 ####### summary
     if no_nb==True:
  # minimum n
@@ -583,7 +678,7 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
               ["Criteria 3 - C statistic", n3, round(cstatistic, 3), round(se_cstat, 3), round(cstatciwidth, 3)], 
               ["Final SS", 1, 1, 1, 1]]
 
-        col_names = ["Criteria", "Sample size", "Perf", "SE", "CI width"]
+        col_names = ["Criteria", "Sample size", "Perf", "SE", "95% CI width"]
  
 
         res_sort = res.sort(key = lambda res:res[1], reverse=False)
@@ -649,7 +744,7 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
               ["Criteria 4 - St Net Benefit", n4, round(standardised_nb, 3), round(se_nb, 3), round(nbciwidth, 3)],
               ["Final SS", 1, 1, 1, 1]]
 
-        col_names = ["Criteria", "Sample size", "Perf", "SE", "CI width"]
+        col_names = ["Criteria", "Sample size", "Perf", "SE", "95% CI width"]
  
 
         res_sort = res.sort(key = lambda res:res[1], reverse=False)
@@ -660,6 +755,80 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
               ["Criteria 4 - St Net Benefit", n4, round(standardised_nb, 3), round(se_nb, 3), round(nbciwidth, 3)],
               SEPARATING_LINE,
               ["Final SS", nfinal, res[4][2], res[4][3], res[4][4]]]
+
+# create additional output table
+        res_add = [["Accuracy", n5, round(accuracy, 3), round(se_accuracy, 3), round(accuracyciwidth, 3)], 
+                  ["Specificity", n6, round(specificity, 3), round(se_spec, 3), round(specciwidth, 3)], 
+                  ["Recall", n7, round(recall, 3), round(se_recall, 3), round(recallciwidth, 3)],
+                  ["Precision", n8, round(precision, 3), round(se_precision, 3), round(precisionciwidth, 3)],
+                  ["F1-score", n9, round(f1, 3), round(se_f1, 3), round(f1ciwidth, 3)],
+                  ["NPV", n10, round(npv, 3), round(se_npv, 3), round(npvciwidth, 3)],                   
+                  ]
+
+        addcol_names = ["Criteria", "Sample size", "Perf", "SE", "95% CI width"]
+
+
+# create precision output table
+        SS = max(n1,n2,n3,n4,n5,n6,n7,n8,n9,n10)
+        # recall
+        se_recall_recn = math.sqrt((recall * (1 - recall)) / (prevalence * SS))
+        recall_lci = recall - 1.96 * se_recall_recn
+        recall_uci = recall + 1.96 * se_recall_recn
+        recallciwidth_recn = recall_uci - recall_lci
+
+        # PRECISION
+        se_precision_recn = math.sqrt((precision * (1 - precision)) / (SS * prevalence * recall * (1 / precision)))
+        precision_lci = precision - 1.96 * se_precision_recn
+        precision_uci = precision + 1.96 * se_precision_recn
+        precisionciwidth_recn = precision_uci - precision_lci
+
+        # SPECIFICITY
+        se_spec_recn = math.sqrt((specificity * (1 - specificity)) / (SS * (1 - prevalence)))
+        spec_lci = specificity - 1.96 * se_spec_recn
+        spec_uci = specificity + 1.96 * se_spec_recn
+        specciwidth_recn = spec_uci - spec_lci
+
+        # ACCURACY
+        se_accuracy_recn = math.sqrt((accuracy * (1 - accuracy)) / SS)
+        accuracy_lci = accuracy - 1.96 * se_accuracy_recn
+        accuracy_uci = accuracy + 1.96 * se_accuracy_recn
+        accuracyciwidth_recn = accuracy_uci - accuracy_lci
+
+        # F1 SCORE
+        f1score = 2 / (1 / precision + 1 / recall)
+
+        cov_1 = (precision * (1 - precision) * (1 - recall)) / prevalence
+        cov_2 = (precision * specificity * (1 - precision)) / (1 - prevalence)
+        cov_p_r = (cov_1 + cov_2) / SS
+
+        se_f1_recn = math.sqrt(4 * (recall**4 * se_precision_recn**2 + 2 * precision**2 * recall**2 * cov_p_r + precision**4 * se_recall_recn**2) / (precision + recall)**4)
+        f1_lci = f1score - 1.96 * se_f1_recn
+        f1_uci = f1score + 1.96 * se_f1_recn
+        f1ciwidth_recn = f1_uci - f1_lci
+
+        # NPV
+        se_npv_recn = math.sqrt((npv * (1 - npv)) / (SS * ((specificity * (1 - prevalence)) + (prevalence * (1 - recall)))))
+        npv_lci = npv - 1.96 * se_npv_recn
+        npv_uci = npv + 1.96 * se_npv_recn
+        npvciwidth_recn = npv_uci - npv_lci
+
+
+        res_recn = [["Accuracy", SS, round(accuracy, 3), round(se_accuracy_recn, 3), 
+                   round(accuracyciwidth_recn, 3), round(accuracy_lci, 3), round(accuracy_uci, 3)], 
+                  ["Specificity", SS, round(specificity, 3), round(se_spec_recn, 3),
+                   round(specciwidth_recn, 3), round(spec_lci, 3), round(spec_uci, 3)], 
+                  ["Recall", SS, round(recall, 3), round(se_recall_recn, 3), 
+                   round(recallciwidth_recn, 3), round(recall_lci, 3), round(recall_uci, 3)],
+                  ["Precision", SS, round(precision, 3), round(se_precision_recn, 3), 
+                   round(precisionciwidth_recn, 3), round(precision_lci, 3), round(precision_uci, 3)],
+                  ["F1-score", SS, round(f1, 3), round(se_f1_recn, 3), round(f1ciwidth_recn, 3),
+                   round(f1_lci, 3), round(f1_uci, 3)],
+                  ["NPV", SS, round(npv, 3), round(se_npv_recn, 3), round(npvciwidth_recn, 3), 
+                   round(npv_lci, 3), round(npv_uci, 3)],                   
+                  ]
+
+        col_names_recn = ["Criteria", "Sample size", "Perf", "SE", "95% CI width", "LCI", "UCI"]
+        
         
         if noprint==None:
 
@@ -669,6 +838,13 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
                   "Criteria 2 - precise estimation of the calibration slope in the validation sample","\n",
                   "Criteria 3 - precise estimation of the C statistic in the validation sample","\n",
                   "Criteria 4 - precise estimation of the standardised net-benefit in the validation sample","\n")
+            
+            if not pd.isna(verbose):
+                print("Minimum SS required to achieve target precision for additional metrics","\n")
+                print(tabulate(res_add, headers=addcol_names, numalign="right"),"\n")    
+                print("Precision achieved at recommended minimum SS","\n")
+                print(tabulate(res_recn, headers=col_names_recn, numalign="right"))   
+                
   
 
         if not pd.isna(lpcstat):
@@ -694,7 +870,27 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
                    "nbciwidth": nbciwidth,
                    "sensitivity": sensitivity,
                    "specificity": specificity,
-                   "threshold": threshold
+                   "threshold": threshold,
+                   "accuracy": accuracy,
+                   "recall": recall,
+                   "precision": precision,
+                   "npv": npv,
+                   "f1": f1,
+                   "accuracyciwidth": accuracyciwidth,
+                   "specciwidth": specciwidth,
+                   "recallciwidth": recallciwidth,
+                   "precisionciwidth": precisionciwidth,
+                   "f1ciwidth": f1ciwidth,
+                   "npvciwidth": npvciwidth,
+                   "se_accuracy": se_accuracy,
+                   "se_recall": se_recall,
+                   "se_precision": se_precision,
+                   "se_spec": se_spec,
+                   "se_f1": se_f1,
+                   "se_npv": se_npv,
+                   "additional_results": res_add,
+                   "precision_results": res_recn,
+                   "verbose": verbose
                    }
         else:
             out = {
@@ -718,7 +914,27 @@ def pmvalsampsize_bin(prevalence,cstatistic,oe,oeciwidth,cslope,csciwidth,
                    "nbciwidth": nbciwidth,
                    "sensitivity": sensitivity,
                    "specificity": specificity,
-                   "threshold": threshold
+                   "threshold": threshold,
+                   "accuracy": accuracy,
+                   "recall": recall,
+                   "precision": precision,
+                   "npv": npv,
+                   "f1": f1,
+                   "accuracyciwidth": accuracyciwidth,
+                   "specciwidth": specciwidth,
+                   "recallciwidth": recallciwidth,
+                   "precisionciwidth": precisionciwidth,
+                   "f1ciwidth": f1ciwidth,
+                   "npvciwidth": npvciwidth, 
+                   "se_accuracy": se_accuracy,
+                   "se_recall": se_recall,
+                   "se_precision": se_precision,
+                   "se_spec": se_spec,
+                   "se_f1": se_f1,
+                   "se_npv": se_npv,
+                   "additional_results": res_add,
+                   "precision_results": res_recn,
+                   "verbose": verbose
                    }
     return out
 
@@ -731,7 +947,8 @@ from tabulate import tabulate, SEPARATING_LINE
 def summary(x, *args):
 
 
-    col_names = ["Criteria", "Sample size", "Perf", "SE", "CI width"]
+    col_names = ["Criteria", "Sample size", "Perf", "SE", "95% CI width"]
+    col_names_recn = ["Criteria", "Sample size", "Perf", "SE", "95% CI width", "LCI", "UCI"]
     
     print("\n", tabulate(x["results_table"], headers=col_names, numalign="right"))
     
@@ -740,3 +957,9 @@ def summary(x, *args):
               "on user inputs = ", x["sample_size"], ",", "\n", "with ", 
               math.ceil(x["events"])," events (assuming an outcome prevalence = "
               , x["prevalence"],")","\n", sep='')
+
+        if x["verbose"] == True:
+            print("Minimum SS required to achieve target precision for additional metrics","\n")
+            print(tabulate(x["additional_results"], headers=col_names, numalign="right"),"\n")    
+            print("Precision achieved at recommended minimum SS","\n")
+            print(tabulate(x["precision_results"], headers=col_names_recn, numalign="right")) 
