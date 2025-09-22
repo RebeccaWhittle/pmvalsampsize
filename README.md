@@ -29,8 +29,10 @@ Interested in contributing? Check out the contributing guidelines. Please note t
 
 ## License
 
-`pmvalsampsize` was created by Rebecca Whittle. It is licensed under the terms of the GNU General Public License v3.0 license.
+`pmvalsampsize` was created by Rebecca Whittle & Joie Ensor. It is licensed under the terms of the GNU General Public License v3.0 license.
 
 ## Credits
+
+`pmvalsampsize` is based on the original R package [pmvalsampsize](https://cran.r-project.org/web/packages/pmvalsampsize/index.html) developed by Joie Ensor. 
 
 `pmvalsampsize` was created with [`cookiecutter`](https://cookiecutter.readthedocs.io/en/latest/) and the `py-pkgs-cookiecutter` [template](https://github.com/py-pkgs/py-pkgs-cookiecutter).
